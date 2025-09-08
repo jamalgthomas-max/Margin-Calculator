@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Margin Calculator — Forward & Reverse</title>
+  <style>
+    :root{ --bg:#ffffff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text)}
+    .wrap{max-width:900px; margin:40px auto; padding:0 16px}
+    header{margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+    h1{margin:0; font-size:clamp(22px,3.5vw,34px); font-weight:800}
+    .mode{display:flex; gap:8px; border:1px solid var(--line); border-radius:10px; padding:4px}
+    .mode button{padding:8px 12px; border:1px solid transparent; border-radius:8px; background:#fff; cursor:pointer; font-weight:700}
+    .mode button.active{border-color:#111827}
+
+    .panel{background:#fff; border:1px solid var(--line); border-radius:14px}
+    .inputs{padding:18px; display:grid; grid-template-columns:1fr; gap:12px}
+    @media (min-width:640px){ .inputs{ grid-template-columns:repeat(4,1fr) } }
+
+    label{font-size:13px; font-weight:700; color:#374151}
+    input{width:100%; margin-top:6px; padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--text); font-size:16px; outline:none}
+    input:focus{border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,.1)}
+
+    .final{margin-top:16px; padding:18px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap}
+    .final h2{margin:0; font-size:16px; color:#374151}
+    .final .big{font-size:clamp(32px,6vw,56px); font-weight:900; letter-spacing:-0.5px}
+
+    .steps{margin-top:20px; display:grid; grid-template-columns:1fr; gap:10px}
+    @media (min-width:640px){ .steps{ grid-template-columns:repeat(3,1fr) } }
+    .stat{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px}
+    .stat h3{margin:0; font-size:12px; color:#6b7280; font-weight:800; letter-spacing:.02em}
+    .stat .value{margin-top:6px; font-size:20px; font-weight:800}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Margin Calculator</h1>
+      <div class="mode" role="tablist" aria-label="mode">
+        <button id="btnForward" class="active" role="tab" aria-selected="true">Forward (Cost → Price)</button>
+        <button id="btnReverse" role="tab" aria-selected="false">Reverse (Price → Max Cost)</button>
+      </div>
+    </header>
+
+    <section class="panel" aria-label="Calculator">
+      <div class="inputs">
+        <!-- Forward input A -->
+        <label for="cost" id="labelA">A) Gross Cost (£)
+          <input id="cost" type="number" inputmode="decimal" placeholder="1.00" min="0" step="0.01" />
+        </label>
+        <!-- Reverse input D (hidden in forward) -->
+        <label for="target" id="labelD" style="display:none">Target Final Sale (£)
+          <input id="target" type="number" inputmode="decimal" placeholder="10.00" min="0" step="0.01" />
+        </label>
+
+        <label for="margin">Gross Margin (%)
+          <input id="margin" type="number" inputmode="decimal" placeholder="60" min="1" max="99.99" step="0.01" />
+        </label>
+        <label for="vat">VAT (%)
+          <input id="vat" type="number" inputmode="decimal" placeholder="20" min="0" max="100" step="0.01" />
+        </label>
+        <label for="disc">Discount uplift (%)
+          <input id="disc" type="number" inputmode="decimal" placeholder="10" min="0" max="99.99" step="0.01" />
+        </label>
+      </div>
+      <div class="final">
+        <h2 id="finalLabel">Final Sale Price (D)</h2>
+        <div id="finalValue" class="big">£–</div>
+      </div>
+    </section>
+
+    <section class="steps" aria-live="polite">
+      <div class="stat">
+        <h3 id="step1Label">A) Gross Cost</h3>
+        <div id="step1" class="value">£–</div>
+      </div>
+      <div class="stat">
+        <h3 id="step2Label">B) After Margin</h3>
+        <div id="step2" class="value">£–</div>
+      </div>
+      <div class="stat">
+        <h3 id="step3Label">C) After VAT</h3>
+        <div id="step3" class="value">£–</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const gbp = new Intl.NumberFormat('en-GB',{ style:'currency', currency:'GBP' });
+    const $ = (id)=>document.getElementById(id);
+
+    const costEl=$('cost'), targetEl=$('target'), marginEl=$('margin'), vatEl=$('vat'), discEl=$('disc');
+    const finalLabel=$('finalLabel'), finalValue=$('finalValue');
+    const step1=$('step1'), step2=$('step2'), step3=$('step3');
+    const step1Label=$('step1Label'), step2Label=$('step2Label'), step3Label=$('step3Label');
+    const labelA=$('labelA'), labelD=$('labelD');
+    const btnForward=$('btnForward'), btnReverse=$('btnReverse');
+
+    let mode='forward';
+
+    function setMode(next){
+      mode = next;
+      const fwd = (mode==='forward');
+      btnForward.classList.toggle('active', fwd);
+      btnForward.setAttribute('aria-selected', fwd);
+      btnReverse.classList.toggle('active', !fwd);
+      btnReverse.setAttribute('aria-selected', !fwd);
+
+      // Show/hide inputs and labels
+      labelA.style.display = fwd ? '' : 'none';
+      labelD.style.display = fwd ? 'none' : '';
+
+      if(fwd){
+        finalLabel.textContent = 'Final Sale Price (D)';
+        step1Label.textContent = 'A) Gross Cost';
+        step2Label.textContent = 'B) After Margin';
+        step3Label.textContent = 'C) After VAT';
+      } else {
+        finalLabel.textContent = 'Max Buy Cost (A)';
+        step1Label.textContent = 'C) After VAT (extracted)';
+        step2Label.textContent = 'B) After Margin (extracted)';
+        step3Label.textContent = 'Target Final Price (D)';
+      }
+      calc();
+    }
+
+    function calc(){
+      const m = parseFloat(marginEl.value); // 1..99.99
+      const v = parseFloat(vatEl.value);    // 0..100
+      const d = parseFloat(discEl.value);   // 0..99.99
+      if(!(m>0 && m<100) || !(v>=0 && v<=100) || !(d>=0 && d<100)){
+        [step1,step2,step3].forEach(el=>el.textContent='£–');
+        finalValue.textContent='£–';
+        return;
+      }
+      const fMargin = 1/(1 - m/100);
+      const fVAT = 1 + v/100;
+      const fDisc = 1 + d/100;
+
+      if(mode==='forward'){
+        const A = parseFloat(costEl.value);
+        if(!(A>=0)){ [step1,step2,step3].forEach(el=>el.textContent='£–'); finalValue.textContent='£–'; return; }
+        const B = A * fMargin;
+        const C = B * fVAT;
+        const D = C * fDisc;
+        step1.textContent = gbp.format(A);
+        step2.textContent = gbp.format(B);
+        step3.textContent = gbp.format(C);
+        finalValue.textContent = gbp.format(D);
+      } else {
+        const D = parseFloat(targetEl.value);
+        if(!(D>=0)){ [step1,step2,step3].forEach(el=>el.textContent='£–'); finalValue.textContent='£–'; return; }
+        // Reverse: A = D * (1 - m) / [(1+v)*(1+d)]
+        const A = D * (1 - m/100) / (fVAT * fDisc);
+        const C = D / fDisc; // strip discount
+        const B = C / fVAT;  // strip VAT
+        step1.textContent = gbp.format(C); // C extracted (ex VAT)
+        step2.textContent = gbp.format(B); // B extracted (after margin)
+        step3.textContent = gbp.format(D); // Target D for clarity
+        finalValue.textContent = gbp.format(A); // Max cost to hit target
+      }
+    }
+
+    ['input','change','keyup','blur'].forEach(ev=>{
+      [costEl, targetEl, marginEl, vatEl, discEl].forEach(el=> el.addEventListener(ev, calc));
+    });
+
+    btnForward.addEventListener('click',()=>setMode('forward'));
+    btnReverse.addEventListener('click',()=>setMode('reverse'));
+
+    // Defaults
+    costEl.value='1.00';
+    targetEl.value='10.00';
+    marginEl.value='60';
+    vatEl.value='20';
+    discEl.value='10';
+    setMode('forward');
+  </script>
+</body>
+</html>
