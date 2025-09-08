@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Margin Calculator</title>
+  <style>
+    :root{
+      --bg:#ffffff; --text:#111827; --muted:#6b7280; --line:#e5e7eb; --accent:#111827;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text)}
+    .wrap{max-width:860px; margin:40px auto; padding:0 16px}
+    header{margin-bottom:20px}
+    h1{margin:0 0 6px; font-size:clamp(24px,3.5vw,34px); font-weight:800}
+
+    .panel{background:#fff; border:1px solid var(--line); border-radius:14px}
+    .inputs{padding:18px; display:grid; grid-template-columns:1fr; gap:12px}
+    @media (min-width:640px){ .inputs{ grid-template-columns:repeat(4,1fr) } }
+
+    label{font-size:13px; font-weight:700; color:#374151}
+    input{width:100%; margin-top:6px; padding:12px 14px; border-radius:10px; border:1px solid var(--line); background:#fff; color:var(--text); font-size:16px; outline:none}
+    input:focus{border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,.1)}
+
+    .final{margin-top:16px; padding:18px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap}
+    .final h2{margin:0; font-size:16px; color:#374151}
+    .final .big{font-size:clamp(32px,6vw,56px); font-weight:900; letter-spacing:-0.5px}
+
+    .steps{margin-top:20px; display:grid; grid-template-columns:1fr; gap:10px}
+    @media (min-width:640px){ .steps{ grid-template-columns:repeat(3,1fr) } }
+    .stat{background:#fff; border:1px solid var(--line); border-radius:12px; padding:14px}
+    .stat h3{margin:0; font-size:12px; color:#6b7280; font-weight:800; letter-spacing:.02em}
+    .stat .value{margin-top:6px; font-size:20px; font-weight:800}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Margin Calculator</h1>
+    </header>
+
+    <section class="panel" aria-label="Calculator">
+      <div class="inputs">
+        <label for="cost">A) Gross Cost (£)
+          <input id="cost" type="number" inputmode="decimal" placeholder="1.00" min="0" step="0.01" />
+        </label>
+        <label for="margin">B) Gross Margin (%)
+          <input id="margin" type="number" inputmode="decimal" placeholder="60" min="1" max="99.99" step="0.01" />
+        </label>
+        <label for="vat">C) VAT (%)
+          <input id="vat" type="number" inputmode="decimal" placeholder="20" min="0" max="100" step="0.01" />
+        </label>
+        <label for="disc">D) Discount uplift (%)
+          <input id="disc" type="number" inputmode="decimal" placeholder="10" min="0" max="99.99" step="0.01" />
+        </label>
+      </div>
+      <div class="final">
+        <h2>Final Sale Price (D)</h2>
+        <div id="priceD" class="big">£–</div>
+      </div>
+    </section>
+
+    <section class="steps" aria-live="polite">
+      <div class="stat">
+        <h3>A) Gross Cost</h3>
+        <div id="priceA" class="value">£–</div>
+      </div>
+      <div class="stat">
+        <h3>B) After Margin</h3>
+        <div id="priceB" class="value">£–</div>
+      </div>
+      <div class="stat">
+        <h3>C) After VAT</h3>
+        <div id="priceC" class="value">£–</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const gbp = new Intl.NumberFormat('en-GB',{ style:'currency', currency:'GBP' });
+    const $ = (id)=>document.getElementById(id);
+
+    const costEl=$('cost'), marginEl=$('margin'), vatEl=$('vat'), discEl=$('disc');
+    const priceA=$('priceA'), priceB=$('priceB'), priceC=$('priceC'), priceD=$('priceD');
+
+    function calc(){
+      const cost = parseFloat(costEl.value);
+      const m = parseFloat(marginEl.value);
+      const v = parseFloat(vatEl.value);
+      const d = parseFloat(discEl.value);
+
+      if(!(cost>=0) || !(m>0 && m<100) || !(v>=0 && v<=100) || !(d>=0 && d<100)){
+        [priceA,priceB,priceC].forEach(el=>el.textContent='£–');
+        priceD.textContent='£–';
+        return;
+      }
+
+      const factorMargin = 1 / (1 - m/100);
+      const factorVat    = 1 + v/100;
+      const factorDisc   = 1 + d/100;
+
+      const A = cost;
+      const B = A * factorMargin;
+      const C = B * factorVat;
+      const D = C * factorDisc;
+
+      priceA.textContent = gbp.format(A);
+      priceB.textContent = gbp.format(B);
+      priceC.textContent = gbp.format(C);
+      priceD.textContent = gbp.format(D);
+    }
+
+    ['input','change','keyup','blur'].forEach(ev=>{
+      [costEl, marginEl, vatEl, discEl].forEach(el=> el.addEventListener(ev, calc));
+    });
+
+    costEl.value = '1.00';
+    marginEl.value = '60';
+    vatEl.value = '20';
+    discEl.value = '10';
+    calc();
+  </script>
+</body>
+</html>
